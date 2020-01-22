@@ -1,0 +1,1263 @@
+#include <iostream>
+#include <pgtypes_date.h>
+EXEC SQL include sqlca;
+using namespace std;
+
+EXEC SQL WHENEVER SQLERROR SQLPRINT;
+
+void connectToDatabase(const char* host, const char* dbname, const char* user, const char* pass) {
+	EXEC SQL BEGIN DECLARE SECTION;
+		char target[256];
+		const char* db = dbname;
+		const char* u = user;
+		const char* p = pass;
+	EXEC SQL END DECLARE SECTION;
+
+	strcpy(target, db);
+	strcat(target, "@");
+	strcat(target, host);
+
+	cout << "target: " << target << endl;
+
+	EXEC SQL CONNECT TO :target USER :u USING :p;
+}
+
+/* SCHOOLS INTERFACE */
+
+void getAllSchools() {
+	EXEC SQL BEGIN DECLARE SECTION;
+	unsigned num;
+	char address[100];
+
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL DECLARE cursor_school CURSOR FOR
+		SELECT num, address FROM school ORDER BY num;
+
+	EXEC SQL OPEN cursor_school;
+
+	while (true) {
+		EXEC SQL FETCH cursor_school INTO :num, :address;
+
+		if (sqlca.sqlcode == ECPG_NOT_FOUND) {
+			break;
+		}
+
+		cout << endl;
+		cout << "School num: " << num << endl;
+		cout << "School address: " << address << endl;
+		cout << endl;
+	}
+
+	EXEC SQL CLOSE cursor_school;
+
+	return;
+}
+
+void getSchoolByNum() {
+	cout << "Enter school number: " << endl;
+	unsigned schoolNum;
+	cin >> schoolNum;
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	const unsigned num = schoolNum;
+	char address[100];
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL SELECT num, address INTO :num, :address FROM school WHERE num = :num;
+	if (sqlca.sqlcode == ECPG_NOT_FOUND || strncmp(sqlca.sqlstate, "00", 2))
+	{
+		cout << "Not found" << endl;
+		return;
+	}
+	cout << endl;
+	cout << "School number: " << num << endl;
+	cout << "School address: " << address << endl;
+	cout << endl;
+
+	return;
+}
+
+void addSchool() {
+	cout << "Enter school number:" << endl;
+	unsigned schoolNumber;
+	cin >> schoolNumber;
+
+	cout << "Enter school address:" << endl;
+	string schoolAddressTmp;
+	cin.ignore();
+	getline(cin, schoolAddressTmp, '\n');
+    const char* schoolAddress = schoolAddressTmp.c_str();
+	
+	EXEC SQL BEGIN DECLARE SECTION;
+	const unsigned num = schoolNumber;
+	const char* address = schoolAddress;
+
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL INSERT INTO school VALUES(:num, :address);
+	EXEC SQL COMMIT;
+
+	return;
+}
+
+void updateSchool() {
+	cout << "Enter school number:" << endl;
+	unsigned schoolNumber;
+	cin >> schoolNumber;
+
+	cout << "Enter school address:" << endl;
+	string schoolAddressTmp;
+	cin.ignore();
+	getline(cin, schoolAddressTmp, '\n');
+    const char* schoolAddress = schoolAddressTmp.c_str();
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	const unsigned num = schoolNumber;
+	const char* address = schoolAddress;
+
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL UPDATE school SET address = :address WHERE num = :num;
+
+	EXEC SQL COMMIT;
+
+	return;
+}
+
+void deleteSchool() {
+    cout << "Enter school number:" << endl;
+    unsigned schoolNumber;
+    cin >> schoolNumber;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+    const unsigned num = schoolNumber;
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL DELETE FROM school WHERE num = :num;
+
+    EXEC SQL COMMIT;
+
+    return;
+}
+
+void schoolMenu() {
+	while (true) {
+		cout << "School menu:" << endl;
+		cout << "1. Add school" << endl;
+		cout << "2. Get school info" << endl;
+		cout << "3. Update school" << endl;
+		cout << "4. Delete school" << endl;
+		cout << "5. Show all schools" << endl;
+		cout << "0. Exit" << endl;
+		int number;
+		cin >> number;
+		switch (number) {
+			case 1: {
+				addSchool();
+				break;
+			}
+			case 2: {
+				getSchoolByNum();
+				break;
+			}
+			case 3: {
+				updateSchool();
+				break;
+			}
+			case 4: {
+				deleteSchool();
+				break;
+			}
+			case 5: {
+				getAllSchools();
+				break;
+			}
+			case 0: {
+				return;
+			}
+			default: {
+				cout << "Wrong number. Enter again" << endl;
+				break;
+			}
+		}
+	}
+}
+
+/* FORMS INTERFACE */
+
+void getAllForms() {
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	char formMasterName[60];
+	char formNum[4];	
+	unsigned schoolNum;
+	unsigned studentsNum;	
+
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL DECLARE cursor_form CURSOR FOR
+		SELECT num, school_number, form_master_name,
+			(SELECT count(*) from student WHERE form_num = num) as number_of_students
+			FROM form ORDER BY num;
+
+	EXEC SQL OPEN cursor_form;
+
+	while (true) {
+		EXEC SQL FETCH cursor_form 
+			INTO :formNum, :schoolNum, :formMasterName, :studentsNum;
+
+		if (sqlca.sqlcode == ECPG_NOT_FOUND) {
+			break;
+		}
+
+		cout << endl;
+		cout << "Form number: " << formNum << endl;
+		cout << "School number: " << schoolNum << endl;
+		cout << "Name of form master: " << formMasterName << endl;
+		cout << "Number of students: " << studentsNum << endl;
+		cout << endl;
+	}
+
+	EXEC SQL CLOSE cursor_form;
+
+	return;
+}
+
+void getFormByNumAndSchoolNum() {
+	cout << "Enter form number: " << endl;
+	string formNumberTmp;
+	cin.ignore();
+	getline(cin, formNumberTmp, '\n');
+    const char* formNumber = formNumberTmp.c_str();
+
+	cout << "Enter school number: " << endl;
+	unsigned schoolNumber;
+	cin >> schoolNumber;
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	const char* formNum = formNumber;
+	const unsigned schoolNum = schoolNumber;
+	unsigned studentsNum;
+	char formMasterName[100];
+
+	EXEC SQL END DECLARE SECTION;
+
+	cout << formNum << ' ' << schoolNum << endl;
+
+	EXEC SQL SELECT num, school_number, form_master_name,
+		(SELECT count(*) from student WHERE form_num = :formNum) as number_of_students
+		INTO :formNum, :schoolNum, :formMasterName, :studentsNum
+		FROM form 
+		WHERE num = :formNum and school_number = :schoolNum;
+
+	if (sqlca.sqlcode == ECPG_NOT_FOUND || strncmp(sqlca.sqlstate, "00", 2))
+	{
+		cout << "Not found" << endl;
+		return;
+	}
+	cout << endl;
+	cout << "Form number: " << formNum << endl;
+	cout << "School number: " << schoolNum << endl;
+	cout << "Name of form master: " << formMasterName << endl;
+	cout << "Number of students: " << studentsNum << endl;
+	cout << endl;
+
+	return;
+}
+
+void addForm() {
+	cout << "Enter form number: " << endl;
+	string formNumberTmp;
+	cin.ignore();
+	getline(cin, formNumberTmp, '\n');
+    const char* formNumber = formNumberTmp.c_str();
+
+	cout << "Enter school number: " << endl;
+	unsigned schoolNumber;
+	cin >> schoolNumber;
+
+	cout << "Enter name of form master:" << endl;
+	string masterNameTmp;
+	cin.ignore();
+	getline(cin, masterNameTmp, '\n');
+	const char* masterName = masterNameTmp.c_str();
+	
+	EXEC SQL BEGIN DECLARE SECTION;
+	const char* formNum = formNumber;
+	const unsigned schoolNum = schoolNumber;
+	const char* formMasterName = masterName;
+
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL INSERT INTO form 
+		VALUES(:formNum, :schoolNum, :formMasterName);
+	EXEC SQL COMMIT;
+
+	return;
+}
+
+void updateForm() {
+	cout << "Enter form number: " << endl;
+	string formNumberTmp;
+	cin.ignore();
+	getline(cin, formNumberTmp, '\n');
+    const char* formNumber = formNumberTmp.c_str();
+
+	cout << "Enter school number:" << endl;
+	unsigned schoolNumber;
+	cin >> schoolNumber;
+
+	cout << "Enter name of form master:" << endl;
+	string masterNameTmp;
+	cin.ignore();
+	getline(cin, masterNameTmp, '\n');
+	const char* masterName = masterNameTmp.c_str();
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	const char* formNum = formNumber;
+	const unsigned schoolNum = schoolNumber;
+	const char* formMasterName = masterName;
+
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL UPDATE form 
+		SET form_master_name = :formMasterName
+			WHERE num = :formNum and school_number = :schoolNum;
+
+	EXEC SQL COMMIT;
+
+	return;
+}
+
+void deleteForm() {
+	cout << "Enter form number: " << endl;
+	string formNumberTmp;
+	cin.ignore();
+	getline(cin, formNumberTmp, '\n');
+    const char* formNumber = formNumberTmp.c_str();
+
+	cout << "Enter school number:" << endl;
+    unsigned schoolNumber;
+    cin >> schoolNumber;
+
+    EXEC SQL BEGIN DECLARE SECTION;
+	const char* formNum = formNumber;
+    const unsigned schoolNum = schoolNumber;
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL DELETE FROM form WHERE num = :formNum and school_number = :schoolNum;
+
+    EXEC SQL COMMIT;
+
+    return;
+}
+
+void formMenu() {
+	while (true) {
+		cout << "Form menu:" << endl;
+		cout << "1. Add form" << endl;
+		cout << "2. Get form info" << endl;
+		cout << "3. Update form" << endl;
+		cout << "4. Delete form" << endl;
+		cout << "5. Show all forms" << endl;
+		cout << "0. Exit" << endl;
+		int number;
+		cin >> number;
+		switch (number) {
+			case 1: {
+				addForm();
+				break;
+			}
+			case 2: {
+				getFormByNumAndSchoolNum();
+				break;
+			}
+			case 3: {
+				updateForm();
+				break;
+			}
+			case 4: {
+				deleteForm();
+				break;
+			}
+			case 5: {
+				getAllForms();
+				break;
+			}
+			case 0: {
+				return;
+			}
+			default: {
+				cout << "Wrong number. Enter again" << endl;
+				break;
+			}
+		}
+	}
+}
+
+/* STUDENTS INTERFACE */
+
+void getAllStudents() {
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	char name[60];
+	char address[100];	
+	date birthDate;
+	unsigned schoolNum;	
+	char formNum[4];
+
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL DECLARE cursor_student CURSOR FOR
+		SELECT name, address, birth_date, school_num, form_num
+			FROM student ORDER BY name;
+
+	EXEC SQL OPEN cursor_student;
+
+	while (true) {
+		EXEC SQL FETCH cursor_student 
+			INTO :name, :address, :birthDate, :schoolNum, :formNum;
+		
+		if (sqlca.sqlcode == ECPG_NOT_FOUND) {
+			break;
+		}
+
+		cout << endl;
+		cout << "Name: " << name << endl;
+		cout << "Address: " << address << endl;
+		cout << "Birth date: " << PGTYPESdate_to_asc(birthDate) << endl;
+		cout << "School number: " << schoolNum << endl;
+		cout << "Form number: " << formNum << endl;
+		cout << endl;
+	}
+
+	EXEC SQL CLOSE cursor_student;
+
+	return;
+}
+
+void getStudentByName() {
+	cout << "Enter student name: " << endl;
+	string studentNameTmp;
+	cin.ignore();
+	getline(cin, studentNameTmp, '\n');
+    const char* studentName = studentNameTmp.c_str();
+
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* name = studentName;
+	char address[100];
+	date birthDate;
+	unsigned schoolNum;
+	char formNum[4];
+
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL SELECT name, address, birth_date, school_num, form_num
+		INTO :name, :address, :birthDate, :schoolNum, :formNum
+		FROM student 
+		WHERE name = :name;
+
+	if (sqlca.sqlcode == ECPG_NOT_FOUND || strncmp(sqlca.sqlstate, "00", 2))
+	{
+		cout << "Not found" << endl;
+		return;
+	}
+	cout << endl;
+	cout << "Name: " << name << endl;
+	cout << "Address: " << address << endl;
+	cout << "Birth date: " << PGTYPESdate_to_asc(birthDate) << endl;
+	cout << "School number: " << schoolNum << endl;
+	cout << "Form number: " << formNum << endl;
+	cout << endl;
+
+	return;
+}
+
+void addStudent() {
+	cout << "Enter student name: " << endl;
+	string studentNameTmp;
+	cin.ignore();
+	getline(cin, studentNameTmp, '\n');
+    const char* studentName = studentNameTmp.c_str();
+
+	cout << "Enter student address: " << endl;
+	string studentAddrTmp;
+	cin.ignore();
+	getline(cin, studentAddrTmp, '\n');
+    const char* studentAddr = studentAddrTmp.c_str();
+
+	cout << "Enter student birth date:" << endl;
+	string studentBirthDateTmp;
+	cin >> studentBirthDateTmp;
+    const char* studentBirthDate = studentBirthDateTmp.c_str();
+
+	cout << "Enter school number:" << endl;
+	unsigned schoolNumber;
+	cin >> schoolNumber;
+
+	cout << "Enter form number:" << endl;
+	string formNumberTmp;
+	cin.ignore();
+	getline(cin, formNumberTmp, '\n');
+    const char* formNumber = formNumberTmp.c_str();
+	
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* name = studentName;
+	const char* address = studentAddr;
+	const char* birthDate = studentBirthDate;
+	const unsigned schoolNum = schoolNumber;
+	const char* formNum = formNumber;
+	
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL INSERT INTO student 
+		VALUES(:name, :address, :birthDate, :schoolNum, :formNum);
+	EXEC SQL COMMIT;
+
+	return;
+}
+
+void updateStudent() {
+	cout << "Enter student name: " << endl;
+	string studentNameTmp;
+	cin.ignore();
+	getline(cin, studentNameTmp, '\n');
+    const char* studentName = studentNameTmp.c_str();
+
+	cout << "Enter student address: " << endl;
+	string studentAddrTmp;
+	cin.ignore();
+	getline(cin, studentAddrTmp, '\n');
+    const char* studentAddr = studentAddrTmp.c_str();
+
+	cout << "Enter student birth date:" << endl;
+	string studentBirthDateTmp;
+	cin.ignore();
+	getline(cin, studentBirthDateTmp, '\n');
+    const char* studentBirthDate = studentBirthDateTmp.c_str();
+
+	cout << "Enter school number:" << endl;
+	unsigned schoolNumber;
+	cin >> schoolNumber;
+
+	cout << "Enter form number:" << endl;
+	string formNumberTmp;
+	cin.ignore();
+	getline(cin, formNumberTmp, '\n');
+    const char* formNumber = formNumberTmp.c_str();
+
+	EXEC SQL BEGIN DECLARE SECTION;
+	const char* name = studentName;
+	const char* address = studentAddr;
+	const char* birthDate = studentBirthDate;
+	const unsigned schoolNum = schoolNumber;
+	const char* formNum = formNumber;
+
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL UPDATE student 
+		SET address = :address,
+			birth_date = :birthDate,
+			school_num = :schoolNum,
+			form_num = :formNum
+			WHERE name = :name;
+
+	EXEC SQL COMMIT;
+
+	return;
+}
+
+void deleteStudent() {
+	cout << "Enter student name: " << endl;
+	string studentNameTmp;
+	cin.ignore();
+	getline(cin, studentNameTmp, '\n');
+    const char* studentName = studentNameTmp.c_str();
+
+    EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* name = studentName;
+
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL DELETE FROM student WHERE name = :name;
+
+    EXEC SQL COMMIT;
+
+    return;
+}
+
+void studentMenu() {
+	while (true) {
+		cout << "Student menu:" << endl;
+		cout << "1. Add student" << endl;
+		cout << "2. Get student info" << endl;
+		cout << "3. Update student" << endl;
+		cout << "4. Delete student" << endl;
+		cout << "5. Show all students" << endl;
+		cout << "0. Exit" << endl;
+		int number;
+		cin >> number;
+		switch (number) {
+			case 1: {
+				addStudent();
+				break;
+			}
+			case 2: {
+				getStudentByName();
+				break;
+			}
+			case 3: {
+				updateStudent();
+				break;
+			}
+			case 4: {
+				deleteStudent();
+				break;
+			}
+			case 5: {
+				getAllStudents();
+				break;
+			}
+			case 0: {
+				return;
+			}
+			default: {
+				cout << "Wrong number. Enter again" << endl;
+				break;
+			}
+		}
+	}
+}
+
+/* SUBJECTS MENU */
+
+void getAllSubjects() {
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	char name[30];
+	char description[500];	
+	char type[20];
+
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL DECLARE cursor_subject CURSOR FOR
+		SELECT name, description, type_of_subject
+			FROM subject ORDER BY name;
+
+	EXEC SQL OPEN cursor_subject;
+
+	while (true) {
+		EXEC SQL FETCH cursor_subject 
+			INTO :name, :description, :type;
+
+		if (sqlca.sqlcode == ECPG_NOT_FOUND) {
+			break;
+		}
+
+		cout << endl;
+		cout << "Name: " << name << endl;
+		cout << "Type of subject: " << type << endl;
+		cout << "Description: " << description << endl;
+		cout << endl;
+	}
+
+	EXEC SQL CLOSE cursor_subject;
+
+	return;
+}
+
+void getSubjectByName() {
+	cout << "Enter subject name: " << endl;
+	string subjectNameTmp;
+	cin.ignore();
+	getline(cin, subjectNameTmp, '\n');
+    const char* subjectName = subjectNameTmp.c_str();
+
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* name = subjectName;
+	char description[500];
+	char type[20];
+
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL SELECT name, description, type_of_subject
+		INTO :name, :description, :type
+		FROM subject 
+		WHERE name = :name;
+
+	if (sqlca.sqlcode == ECPG_NOT_FOUND || strncmp(sqlca.sqlstate, "00", 2))
+	{
+		cout << "Not found" << endl;
+		return;
+	}
+	cout << endl;
+	cout << "Name: " << name << endl;
+	cout << "Type of subject: " << type << endl;
+	cout << "Description: " << description << endl;
+	cout << endl;
+
+	return;
+}
+
+string chooseSubjectType() {
+	while (true) {
+		cout << "Choose subject type: " << endl;
+		cout << "1. Technical" << endl;
+		cout << "2. Humanitarian" << endl;
+
+		unsigned subjectTypeNum;
+		cin >> subjectTypeNum;
+
+		if (subjectTypeNum == 1) { return "technical"; }
+		else if (subjectTypeNum == 2) {	return "humanitarian"; }
+		else { 
+			cout << "Wrong type: Choose again" << endl;
+			continue;
+	    }
+	}	
+}
+
+void addSubject() {
+	cout << "Enter subject name: " << endl;
+	string subjectNameTmp;
+	cin.ignore();
+	getline(cin, subjectNameTmp, '\n');
+    const char* subjectName = subjectNameTmp.c_str();
+	
+	const char* subjectType = chooseSubjectType().c_str();	
+
+	cout << "Enter subject description:" << endl;
+	string subjectDescriptionTmp;
+	cin.ignore();
+	getline(cin, subjectDescriptionTmp, '\n');
+    const char* subjectDescription = subjectDescriptionTmp.c_str();
+	
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* name = subjectName;
+	const char* type = subjectType;
+	const char* description = subjectDescription;
+	
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL INSERT INTO subject 
+		VALUES(:name, :description, :type);
+	EXEC SQL COMMIT;
+
+	return;
+}
+
+void updateSubject() {
+	cout << "Enter subject name: " << endl;
+	string subjectNameTmp;
+	cin.ignore();
+	getline(cin, subjectNameTmp, '\n');
+    const char* subjectName = subjectNameTmp.c_str();
+	
+	const char* subjectType = chooseSubjectType().c_str();	
+
+	cout << "Enter subject description:" << endl;
+	string subjectDescriptionTmp;
+	cin.ignore();
+	getline(cin, subjectDescriptionTmp, '\n');
+    const char* subjectDescription = subjectDescriptionTmp.c_str();
+
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* name = subjectName;
+	const char* type = subjectType;
+	const char* description = subjectDescription;
+
+	EXEC SQL END DECLARE SECTION;
+
+	cout << name << type << description << endl;
+
+	EXEC SQL UPDATE subject 
+		SET type_of_subject = :type,
+			description = :description			
+			WHERE name = :name;
+	
+	EXEC SQL COMMIT;
+
+	return;
+}
+
+void deleteSubject() {
+	cout << "Enter subject name: " << endl;
+	string subjectNameTmp;
+	cin.ignore();
+	getline(cin, subjectNameTmp, '\n');
+    const char* subjectName = subjectNameTmp.c_str();
+
+    EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* name = subjectName;
+
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL DELETE FROM subject WHERE name = :name;
+
+    EXEC SQL COMMIT;
+
+    return;
+}
+
+void subjectMenu() {
+	while (true) {
+		cout << "Subject menu:" << endl;
+		cout << "1. Add subject" << endl;
+		cout << "2. Get subject info" << endl;
+		cout << "3. Update subject" << endl;
+		cout << "4. Delete subject" << endl;
+		cout << "5. Show all subjects" << endl;
+		cout << "0. Exit" << endl;
+		int number;
+		cin >> number;
+		switch (number) {
+			case 1: {
+				addSubject();
+				break;
+			}
+			case 2: {
+				getSubjectByName();
+				break;
+			}
+			case 3: {
+				updateSubject();
+				break;
+			}
+			case 4: {
+				deleteSubject();
+				break;
+			}
+			case 5: {
+				getAllSubjects();
+				break;
+			}
+			case 0: {
+				return;
+			}
+			default: {
+				cout << "Wrong number. Enter again" << endl;
+				break;
+			}
+		}
+	}
+}
+
+/* PERFORMANCE INTERFACE */
+
+void getAllPerformances() {
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	char studentName[60];
+	char subjectName[30];
+	float avgMark;
+
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL DECLARE cursor_performance CURSOR FOR
+		SELECT student_name, subject_name, average_mark
+			FROM student_performance ORDER BY student_name;
+
+	EXEC SQL OPEN cursor_performance;
+
+	while (true) {
+		EXEC SQL FETCH cursor_performance 
+			INTO :studentName, :subjectName, :avgMark;
+
+		if (sqlca.sqlcode == ECPG_NOT_FOUND) {
+			break;
+		}
+
+		cout << endl;
+		cout << "Student name: " << studentName << endl;
+		cout << "Subject name: " << subjectName << endl;
+		cout << "Average mark: " << avgMark << endl;
+		cout << endl;
+	}
+
+	EXEC SQL CLOSE cursor_performance;
+
+	return;
+}
+
+void getStudentPerformance() {
+	cout << "Enter student name:" << endl;
+	string nameTmp;
+	cin.ignore();
+	getline(cin, nameTmp, '\n');
+    const char* name = nameTmp.c_str();
+
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* studentName = name;
+	char subjectName[30];
+	float avgMark;
+
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL DECLARE cursor_performance_of_student CURSOR FOR
+		SELECT subject_name, average_mark
+			FROM student_performance 
+			WHERE student_name = :studentName
+			ORDER BY subject_name;
+
+	EXEC SQL OPEN cursor_performance_of_student;
+	
+	cout << "Performance for student " << studentName << ":" << endl;
+	while (true) {
+		EXEC SQL FETCH cursor_performance_of_student 
+			INTO :subjectName, :avgMark;
+
+		if (sqlca.sqlcode == ECPG_NOT_FOUND) {
+			break;
+		}
+
+		cout << endl;
+		cout << "Subject name: " << subjectName << endl;
+		cout << "Average mark: " << avgMark << endl;
+		cout << endl;
+	}
+
+	EXEC SQL CLOSE cursor_performance_of_student;
+
+	return;
+}
+
+void getSubjectPerformance() {
+	cout << "Enter subject name:" << endl;
+	string nameTmp;
+	cin.ignore();
+	getline(cin, nameTmp, '\n');
+    const char* name = nameTmp.c_str();
+
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* subjectName = name;
+	char studentName[30];
+	float avgMark;
+
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL DECLARE cursor_performance_for_subject CURSOR FOR
+		SELECT student_name, average_mark
+			FROM student_performance 
+			WHERE subject_name = :subjectName
+			ORDER BY student_name;
+
+	EXEC SQL OPEN cursor_performance_for_subject;
+	
+	cout << "Performance for subject " << subjectName << ":" << endl;
+	while (true) {
+		EXEC SQL FETCH cursor_performance_for_subject 
+			INTO :studentName, :avgMark;
+
+		if (sqlca.sqlcode == ECPG_NOT_FOUND) {
+			break;
+		}
+
+		cout << endl;
+		cout << "Student name: " << studentName << endl;
+		cout << "Average mark: " << avgMark << endl;
+		cout << endl;
+	}
+
+	EXEC SQL CLOSE cursor_performance_for_subject;
+
+	return;
+}
+
+void getStudentPerformanceForSubject() {
+	cout << "Enter student name:" << endl;
+	string studNameTmp;
+	cin.ignore();
+	getline(cin, studNameTmp, '\n');
+    const char* studName = studNameTmp.c_str();
+
+	cout << "Enter subject name:" << endl;
+	string subjNameTmp;
+	cin.ignore();
+	getline(cin, subjNameTmp, '\n');
+    const char* subjName = subjNameTmp.c_str();
+
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* studentName = studName;
+	const char* subjectName = subjName;
+	float avgMark;
+
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL SELECT student_name, subject_name, average_mark
+		INTO :studentName, :subjectName, :avgMark
+		FROM student_performance
+		WHERE student_name = :studentName and subject_name = :subjectName;
+
+	if (sqlca.sqlcode == ECPG_NOT_FOUND || strncmp(sqlca.sqlstate, "00", 2))
+	{
+		cout << "Not found" << endl;
+		return;
+	}
+	cout << endl;
+	cout << "Student name: " << studentName << endl;
+	cout << "Subject name: " << subjectName << endl;
+	cout << "Average mark: " << avgMark << endl;
+	cout << endl;
+
+	return;
+}
+
+void addPerformance() {
+	cout << "Enter student name:" << endl;
+	string studNameTmp;
+	cin.ignore();
+	getline(cin, studNameTmp, '\n');
+    const char* studName = studNameTmp.c_str();
+
+	cout << "Enter subject name:" << endl;
+	string subjNameTmp;
+	getline(cin, subjNameTmp, '\n');
+    const char* subjName = subjNameTmp.c_str();
+
+	cout << "Enter average mark:";
+	float mark;
+	cin >> mark;
+
+	cout << studName << ' ' << subjName << ' ' << endl;
+	
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* studentName = studName;
+	const char* subjectName = subjName;
+	const float avgMark = mark;
+	
+	EXEC SQL END DECLARE SECTION;
+
+	EXEC SQL INSERT INTO student_performance 
+		VALUES(:studentName, :subjectName, :avgMark);
+	EXEC SQL COMMIT;
+
+	return;
+}
+
+void updatePerformance() {
+	cout << "Enter student name:" << endl;
+	string studNameTmp;
+	cin.ignore();
+	getline(cin, studNameTmp, '\n');
+    const char* studName = studNameTmp.c_str();
+
+	cout << "Enter subject name:" << endl;
+	string subjNameTmp;
+	getline(cin, subjNameTmp, '\n');
+    const char* subjName = subjNameTmp.c_str();
+
+	cout << "Enter average mark:";
+	float mark;
+	cin >> mark;
+	
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* studentName = studName;
+	const char* subjectName = subjName;
+	const float avgMark = mark;
+	
+	EXEC SQL END DECLARE SECTION;
+	EXEC SQL UPDATE student_performance 
+		SET average_mark = :avgMark				
+		WHERE student_name = :studentName and subject_name = :subjectName;
+	
+	EXEC SQL COMMIT;
+
+	return;
+}
+
+void deletePerformance() {
+	cout << "Enter student name:" << endl;
+	string studNameTmp;
+	cin.ignore();
+	getline(cin, studNameTmp, '\n');
+    const char* studName = studNameTmp.c_str();
+
+	cout << "Enter subject name:" << endl;
+	string subjNameTmp;
+	getline(cin, subjNameTmp, '\n');
+    const char* subjName = subjNameTmp.c_str();
+
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* studentName = studName;
+	const char* subjectName = subjName;
+
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL DELETE FROM student_performance 
+		WHERE student_name = :studentName and subject_name = :subjectName;
+
+    EXEC SQL COMMIT;
+
+    return;
+}
+
+void deleteStudentPerformance () {
+	cout << "Enter student name:" << endl;
+	string studNameTmp;
+	cin.ignore();
+	getline(cin, studNameTmp, '\n');
+    const char* studName = studNameTmp.c_str();
+
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* studentName = studName;
+
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL DELETE FROM student_performance 
+		WHERE student_name = :studentName;
+
+    EXEC SQL COMMIT;
+
+    return;
+}
+
+void deleteSubjectPerformance () {
+	cout << "Enter subject name:" << endl;
+	string subjNameTmp;
+	cin.ignore();
+	getline(cin, subjNameTmp, '\n');
+    const char* subjName = subjNameTmp.c_str();
+
+	EXEC SQL BEGIN DECLARE SECTION;
+
+	const char* subjectName = subjName;
+
+    EXEC SQL END DECLARE SECTION;
+
+    EXEC SQL DELETE FROM student_performance 
+		WHERE subject_name = :subjectName;
+
+    EXEC SQL COMMIT;
+
+    return;
+}
+
+void performanceMenu() {
+	while (true) {
+		cout << "Performance menu:" << endl;
+		cout << "1. Add performance" << endl;
+		cout << "2. Get performance info for student" << endl;
+		cout << "3. Get performance info for subject" << endl;
+		cout << "4. Get performance info for subject and student" << endl;
+		cout << "5. Update performance" << endl;
+		cout << "6. Delete performance for student" << endl;
+		cout << "7. Delete performance for subject" << endl;
+		cout << "8. Delete performance for subject and student" << endl;
+		cout << "9. Show all performances" << endl;
+		cout << "0. Exit" << endl;
+		int number;
+		cin >> number;
+		switch (number) {
+			case 1: {
+				addPerformance();
+				break;
+			}
+			case 2: {
+				getStudentPerformance();
+				break;
+			}
+			case 3: {
+				getSubjectPerformance();
+				break;
+			}
+			case 4: {
+				getStudentPerformanceForSubject();
+				break;
+			}
+			case 5: {
+				updatePerformance();
+				break;
+			}
+			case 6: {
+				deleteStudentPerformance();
+				break;
+			}
+			case 7: {
+				deleteSubjectPerformance();
+				break;
+			}
+			case 8: {
+				deletePerformance();
+				break;
+			}
+			case 9: {
+				getAllPerformances();
+				break;
+			}
+			case 0: {
+				return;
+			}
+			default: {
+				cout << "Wrong number. Enter again" << endl;
+				break;
+			}
+		}
+	}
+}
+
+/* MAIN MENU */
+
+void menu() {
+	while (true) {
+		cout << "Menu:" << endl;
+		cout << "1. Schools" << endl;
+		cout << "2. Forms" << endl;
+		cout << "3. Students" << endl;
+		cout << "4. Subjects" << endl;
+		cout << "5. Performance" << endl;
+        cout << "6. Events (CRUD-interface is not implemented)" << endl;
+        cout << "7. Participation (CRUD-interface is not implemented)" << endl;
+		cout << "0. Exit" << endl;
+		int number;
+		cin >> number;
+		switch (number) {
+			case 1: {
+				schoolMenu();
+				break;
+			}
+			case 2: {
+				formMenu();
+				break;
+			}
+			case 3: {
+				studentMenu();
+				break;
+			}
+			case 4: {
+				subjectMenu();
+				break;
+			}
+		    case 5: {
+				performanceMenu();
+				break;
+			}
+			case 0: {
+				return;
+			}
+			default: {
+				cout << "Wrong number. Enter again" << endl;
+				break;
+			}
+		}
+	}
+	return;
+}
+
+int main() {
+    connectToDatabase("localhost:5432", "postgres", "postgres", "superuser");
+
+    menu();
+
+    return 0;
+}
